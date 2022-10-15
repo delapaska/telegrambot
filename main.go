@@ -2,36 +2,14 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	_ "github.com/lib/pq"
 )
-
-type bnResp struct {
-	Price float64 `json:"price,string"`
-	Code  int64   `json:"code"`
-}
-
-type wallet map[string]float64
-
-var db = map[int64]wallet{}
-
-const (
-	host     = "localhost"
-	port     = 8080
-	user     = "postgres"
-	password = "S8859306s"
-	dbname   = "DB"
-)
-
-var dbInfo = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 
 func CheckError(err error) {
 	if err != nil {
@@ -84,14 +62,18 @@ func main() {
 			if err != nil {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, err.Error()))
 			}
+			row := db_1.QueryRow("SELECT username FROM users where username= $1 and vallet = $2", update.Message.Chat.UserName, command[1])
+			err = row.Scan(&update.Message.Chat.UserName)
+			if err != nil {
+				err = db_1.QueryRow(sqlStatement, update.Message.Chat.UserName, command[1], command[2]).Scan(&id)
+			} else {
+				db_1.Exec("UPDATE users SET sun = sun + $1", amount)
+			}
 
 			if _, ok := db[update.Message.Chat.ID]; !ok {
 				db[update.Message.Chat.ID] = wallet{}
 			}
-			err = db_1.QueryRow(sqlStatement, `@`+update.Message.Chat.UserName, command[1], command[2]).Scan(&id)
-			if err != nil {
-				panic(err)
-			}
+
 			db[update.Message.Chat.ID][command[1]] += amount
 			balanceText := fmt.Sprintf("%f", db[update.Message.Chat.ID][command[1]])
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, balanceText))
@@ -128,32 +110,16 @@ func main() {
 			msg += fmt.Sprintf("Total: %.2f\n", sum)
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, msg))
 
+		case "DELETE":
+			sqlDelete := `DELETE FROM users WHERE id > 0; `
+			_, err := db_1.Exec(sqlDelete)
+			if err != nil {
+				panic(err)
+
+			}
 		default:
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "command not found"))
 		}
 
 	}
-}
-
-func getPrice(symbol string) (price float64, err error) {
-	resp, err := http.Get(fmt.Sprintf("https://api.binance.com/api/v3/ticker/price?symbol=%sUSDT", symbol))
-	if err != nil {
-		return
-	}
-
-	defer resp.Body.Close()
-
-	var jsonResp bnResp
-
-	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
-	if err != nil {
-		return
-	}
-
-	if jsonResp.Code != 0 {
-		err = errors.New("wrong symbol")
-	}
-	price = jsonResp.Price
-
-	return
 }
