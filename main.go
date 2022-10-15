@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	_ "github.com/lib/pq"
 )
 
 type bnResp struct {
@@ -21,7 +23,34 @@ type wallet map[string]float64
 
 var db = map[int64]wallet{}
 
+const (
+	host     = "localhost"
+	port     = 8080
+	user     = "postgres"
+	password = "S8859306s"
+	dbname   = "DB"
+)
+
+var dbInfo = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+
+func CheckError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
+	db_1, err := sql.Open("postgres", dbInfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db_1.Close()
+	sqlStatement := `
+	INSERT INTO users (username, vallet, sun)
+	VALUES ($1, $2, $3)
+	RETURNING id`
+	id := 0
+
 	bot, err := tgbotapi.NewBotAPI("5456123319:AAHc27zB0_TrSVS6LL8h0VYV4hbRiTY1J_w")
 	if err != nil {
 		log.Panic(err)
@@ -44,17 +73,24 @@ func main() {
 		command := strings.Split(update.Message.Text, " ")
 
 		switch command[0] {
+
 		case "ADD":
 			if len(command) != 3 {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "wrong command"))
+
 			}
 			amount, err := strconv.ParseFloat(command[2], 64)
+
 			if err != nil {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, err.Error()))
 			}
 
 			if _, ok := db[update.Message.Chat.ID]; !ok {
 				db[update.Message.Chat.ID] = wallet{}
+			}
+			err = db_1.QueryRow(sqlStatement, `@`+update.Message.Chat.UserName, command[1], command[2]).Scan(&id)
+			if err != nil {
+				panic(err)
 			}
 			db[update.Message.Chat.ID][command[1]] += amount
 			balanceText := fmt.Sprintf("%f", db[update.Message.Chat.ID][command[1]])
