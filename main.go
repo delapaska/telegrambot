@@ -82,6 +82,15 @@ func main() {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "wrong command"))
 			}
 			amount, err := strconv.ParseFloat(command[2], 64)
+
+			row := db_1.QueryRow("SELECT username FROM users where username= $1 and vallet = $2", update.Message.Chat.UserName, command[1])
+			err = row.Scan(&update.Message.Chat.UserName)
+			if err != nil {
+				err = db_1.QueryRow(sqlStatement, update.Message.Chat.UserName, command[1], command[2]).Scan(&id)
+			} else {
+				db_1.Exec("UPDATE users SET sun = sun - $1", amount)
+			}
+
 			if err != nil {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, err.Error()))
 			}
@@ -97,8 +106,16 @@ func main() {
 			if len(command) != 2 {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "wrong command"))
 			}
+			row := db_1.QueryRow("SELECT username FROM users where username= $1 and vallet = $2", update.Message.Chat.UserName, command[1])
+			err = row.Scan(&update.Message.Chat.UserName)
+			if err != nil {
+				err = db_1.QueryRow(sqlStatement, update.Message.Chat.UserName, command[1], command[2]).Scan(&id)
+			} else {
+				db_1.Exec("Delete from users WHERE vallet = $1", command[1])
+			}
 
 			delete(db[update.Message.Chat.ID], command[1])
+
 		case "SHOW":
 			msg := ""
 			var sum float64 = 0
