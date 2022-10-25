@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/golang-migrate/migrate"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 )
 
@@ -21,6 +23,15 @@ func main() {
 	db_1, err := sql.Open("postgres", dbInfo)
 	if err != nil {
 		panic(err)
+	}
+	m, err := migrate.New(
+		"file://db/migrations",
+		"postgres://postgres:S8859306s@localhost:8080/DB?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := m.Up(); err != nil {
+		log.Fatal(err)
 	}
 	defer db_1.Close()
 	sqlStatement := `
