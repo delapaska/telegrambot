@@ -1,27 +1,16 @@
 package repository
 
-import "database/sql"
+import "test/internal/repository/models"
 
-type Repository struct {
-	db *sql.DB
+type Repository interface {
+	User() UserRepository
+	Price() PriceRepository
 }
 
-func New(db *sql.DB) *Repository {
-	return &Repository{
-		db: db,
-	}
+type UserRepository interface {
+	Delete() error
 }
 
-func (r *Repository) Delete() error {
-	query := `DELETE FROM users WHERE id > 0; `
-	_, err := r.db.Exec(query)
-	if err != nil {
-		return err
-	}
-
-	return nil
+type PriceRepository interface {
+	GetAll() ([]models.Price, error)
 }
-
-//func ()  {
-	
-//}

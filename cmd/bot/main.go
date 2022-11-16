@@ -2,10 +2,10 @@ package main
 
 import (
 	"net/http"
+	"test/internal/repository/repository_impl"
 
 	"test/config"
 	"test/internal/bot"
-	"test/internal/repository"
 	"test/pkg/db/postgresql"
 	//	"github.com/joho/godotenv"
 )
@@ -20,7 +20,7 @@ func main() {
 	// Инициализация бд
 	conDB := postgresql.NewPostgresDB(cfg)
 
-	repo := repository.New(conDB)
+	repo := repository_impl.New(conDB)
 
 	// Инициализация серверва
 	// ...
@@ -29,7 +29,7 @@ func main() {
 	// ...
 
 	// Инициализация бота
-	bot := bot.NewBot(*repo, http.Client{})
+	bot := bot.NewBot(repo, http.Client{})
 
 	bot.Run()
 }

@@ -44,6 +44,17 @@ func (b *Bot) Run() {
 		log.Panic(err)
 	}
 
+	// Вот тут просто вызываешь методы репозитория который определены
+	if err := b.repo.User().Delete(); err != nil {
+		log.Println(err)
+	}
+
+	prices, err := b.repo.Price().GetAll()
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println(prices)
+
 	bot.Debug = true
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
