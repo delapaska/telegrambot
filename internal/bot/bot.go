@@ -1,31 +1,59 @@
-package main
+package bot
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"test/config"
+	"test/internal/repository"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
 )
 
-type bnResp struct {
-	Price float64 `json:"price,string"`
-	Code  int64   `json:"code"`
-}
+type Bot struct {
+	repo   repository.Repository
+	client http.Client
 
+	//adad
+}
 type wallet map[string]float64
 
 var db = map[int64]wallet{}
 
-func main() {
-	bot, err := tgbotapi.NewBotAPI("5456123319:AAHc27zB0_TrSVS6LL8h0VYV4hbRiTY1J_w")
+func NewBot(repo repository.Repository, client http.Client) *Bot {
+	return &Bot{
+		repo:   repo,
+		client: client,
+	}
+}
+
+func (b *Bot) Run() {
+	envErr := godotenv.Load("C:/telegrambot/.env")
+	if envErr != nil {
+		fmt.Printf("Could not load .env file")
+
+	}
+	//fmt.Printf("POSTGRES HOST %s \n", os.Getenv("token"))
+	fmt.Printf(config.GetCommonEnvConfigs().TgBot.TOKEN)
+	bot, err := tgbotapi.NewBotAPI(os.Getenv("TOKEN"))
 	if err != nil {
 		log.Panic(err)
 	}
+
+	// Вот тут просто вызываешь методы репозитория который определены
+	if err := b.repo.User().Delete(); err != nil {
+		log.Println(err)
+	}
+
+	prices, err := b.repo.Price().GetAll()
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println(prices)
 
 	bot.Debug = true
 
@@ -40,9 +68,7 @@ func main() {
 		if update.Message == nil { // If we got a message
 			continue
 		}
-
 		command := strings.Split(update.Message.Text, " ")
-
 		switch command[0] {
 		case "ADD":
 			if len(command) != 3 {
@@ -64,17 +90,16 @@ func main() {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "wrong command"))
 			}
 			amount, err := strconv.ParseFloat(command[2], 64)
+
 			if err != nil {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, err.Error()))
 			}
-
 			if _, ok := db[update.Message.Chat.ID]; !ok {
 				continue
 			}
 			db[update.Message.Chat.ID][command[1]] -= amount
 			balanceText := fmt.Sprintf("%f", db[update.Message.Chat.ID][command[1]])
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, balanceText))
-
 		case "DEL":
 			if len(command) != 2 {
 				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "wrong command"))
@@ -91,33 +116,10 @@ func main() {
 			}
 			msg += fmt.Sprintf("Total: %.2f\n", sum)
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, msg))
+		case "DELETE":
 
 		default:
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "command not found"))
 		}
-
 	}
-}
-
-func getPrice(symbol string) (price float64, err error) {
-	resp, err := http.Get(fmt.Sprintf("https://api.binance.com/api/v3/ticker/price?symbol=%sUSDT", symbol))
-	if err != nil {
-		return
-	}
-
-	defer resp.Body.Close()
-
-	var jsonResp bnResp
-
-	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
-	if err != nil {
-		return
-	}
-
-	if jsonResp.Code != 0 {
-		err = errors.New("wrong symbol")
-	}
-	price = jsonResp.Price
-
-	return
 }
